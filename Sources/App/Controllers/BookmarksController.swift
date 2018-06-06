@@ -2,13 +2,21 @@ import Vapor
 
 final class BookmarksController {
  
-    func fetch(_ req: Request) throws -> Future<String> {
+    func fetch(_ req: Request) throws -> Future<HTTPResponse> {
+
         return try req.parameters.next(Bookmarks.self).map { bookmarks in
-            return bookmarks.json
+            var headers = HTTPHeaders()
+            headers.replaceOrAdd(name: .contentType, value: "application/json")
+            
+            var response: HTTPResponse = HTTPResponse(status: .ok)
+            response.body = HTTPBody(string: bookmarks.json)
+            response.headers = headers
+            
+            return response
         }
     }
 
-    func create(_ req: Request) throws -> Future<String> {
+    func create(_ req: Request) throws -> Future<HTTPResponse> {
         guard let data = req.http.body.data else {
             throw Abort(.badRequest, reason: "No body")
         }
@@ -24,10 +32,14 @@ final class BookmarksController {
         }
 
         let bookmarks = Bookmarks(id: nil, json: bookmarksJson)
+
+        var response: HTTPResponse = HTTPResponse(status: .created)
+
         return bookmarks.save(on: req).map { bookmarks in
-            return bookmarks.id!.uuidString
-        }
-        
+            var headers = HTTPHeaders()
+            headers.replaceOrAdd(name: .location, value: bookmarks.id!.uuidString)
+            response.headers = headers
+        }.transform(to: response)
     }
 
 }
